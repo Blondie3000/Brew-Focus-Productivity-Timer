@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CoffeeIllustration } from './components/CoffeeIllustration';
 import { BaristaBot } from './components/BaristaBot';
 import { RoastToggle } from './components/RoastToggle';
 import { TimerMode, MODES, RoastType } from './types';
-import { Play, Pause, RotateCcw, Coffee } from 'lucide-react';
+import { Play, Pause, RotateCcw, Coffee, Zap } from 'lucide-react';
 
 const ROAST_THEMES = {
   light: {
@@ -48,16 +48,90 @@ const ROAST_THEMES = {
   }
 };
 
+// Inline Worker Code to avoid URL resolution issues in some environments
+const WORKER_SCRIPT = `
+let timerId = null;
+let endTime = null;
+let remainingTime = 0;
+
+self.onmessage = function(e) {
+  const { type, payload } = e.data;
+
+  switch (type) {
+    case 'START':
+      if (timerId) clearInterval(timerId);
+      // We use a target end time rather than just decrementing a counter.
+      // This prevents drift if the thread sleeps.
+      remainingTime = payload;
+      endTime = Date.now() + (remainingTime * 1000);
+      
+      timerId = setInterval(() => {
+        if (!endTime) return;
+        const now = Date.now();
+        const timeLeft = Math.ceil((endTime - now) / 1000);
+        
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          timerId = null;
+          self.postMessage({ type: 'COMPLETE' });
+        } else {
+          self.postMessage({ type: 'TICK', payload: timeLeft });
+        }
+      }, 100);
+      break;
+      
+    case 'PAUSE':
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      if (endTime) {
+        const now = Date.now();
+        remainingTime = Math.ceil((endTime - now) / 1000);
+      }
+      break;
+      
+    case 'RESET':
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      remainingTime = 0;
+      endTime = null;
+      break;
+  }
+};
+`;
+
 const App: React.FC = () => {
   const [mode, setMode] = useState<TimerMode>(TimerMode.FOCUS);
   const [timeLeft, setTimeLeft] = useState(MODES[TimerMode.FOCUS].duration);
   const [isActive, setIsActive] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  
+  // sessionCount tracks TOTAL completed focus sessions for stats
   const [sessionCount, setSessionCount] = useState(0);
+  
+  // cycleCount tracks the 1-4 progress towards a long break
+  const [cycleCount, setCycleCount] = useState(0); 
+
   const [customDuration, setCustomDuration] = useState(20 * 60);
   const [roast, setRoast] = useState<RoastType>('light');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  // Initialize Web Worker using Blob (Robust against URL resolution errors)
+  useEffect(() => {
+    const blob = new Blob([WORKER_SCRIPT], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    workerRef.current = new Worker(workerUrl);
+
+    return () => {
+      workerRef.current?.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []);
 
   // Apply Theme CSS Variables
   useEffect(() => {
@@ -75,37 +149,97 @@ const App: React.FC = () => {
   const totalTime = mode === TimerMode.CUSTOM ? customDuration : MODES[mode].duration;
   const progress = isComplete ? 1 : (totalTime - timeLeft) / totalTime;
 
-  useEffect(() => {
-    let interval: number | undefined;
+  // --- CORE STATE MACHINE LOGIC ---
+  const handleTimerComplete = useCallback(() => {
+    playNotification();
+    setIsComplete(true);
 
-    if (isActive && timeLeft > 0) {
-      interval = window.setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && isActive) {
+    // If Custom mode, just stop.
+    if (mode === TimerMode.CUSTOM) {
       setIsActive(false);
-      setIsComplete(true);
-      playNotification();
-      if (mode === TimerMode.FOCUS || mode === TimerMode.CUSTOM) {
-        setSessionCount(c => c + 1);
-      }
+      setSessionCount(c => c + 1);
+      return;
     }
 
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft, mode]);
+    // For automated modes, wait 2 seconds to show "Complete" state, then transition
+    setTimeout(() => {
+      let nextMode: TimerMode = TimerMode.FOCUS;
+      let shouldResetCycle = false;
+      let shouldIncrementTotal = false;
+
+      // Determine Next State based on Current State
+      if (mode === TimerMode.FOCUS) {
+        shouldIncrementTotal = true;
+        const nextCycle = cycleCount + 1;
+        setCycleCount(nextCycle);
+
+        // Logic: 4th completed focus session triggers Long Break
+        if (nextCycle === 4) {
+          nextMode = TimerMode.LONG_BREAK;
+        } else {
+          nextMode = TimerMode.SHORT_BREAK;
+        }
+      } 
+      else if (mode === TimerMode.SHORT_BREAK) {
+        nextMode = TimerMode.FOCUS;
+      } 
+      else if (mode === TimerMode.LONG_BREAK) {
+        nextMode = TimerMode.FOCUS;
+        shouldResetCycle = true;
+      }
+
+      // Apply State Changes
+      if (shouldIncrementTotal) setSessionCount(prev => prev + 1);
+      if (shouldResetCycle) setCycleCount(0);
+      
+      setMode(nextMode);
+      const newDuration = MODES[nextMode].duration;
+      setTimeLeft(newDuration);
+      setIsComplete(false);
+      setIsActive(true); // Auto-start the next phase
+      
+      // Start the worker for the new phase
+      workerRef.current?.postMessage({ type: 'START', payload: newDuration });
+    }, 2000);
+  }, [mode, cycleCount, customDuration]);
+
+  // Listen to Worker Messages
+  useEffect(() => {
+    if (!workerRef.current) return;
+
+    workerRef.current.onmessage = (e: MessageEvent) => {
+      const { type, payload } = e.data;
+      if (type === 'TICK') {
+        setTimeLeft(payload);
+      } else if (type === 'COMPLETE') {
+        setTimeLeft(0);
+        handleTimerComplete();
+      }
+    };
+  }, [handleTimerComplete]); // Re-bind when state logic changes
 
   const toggleTimer = () => {
     if (timeLeft === 0 && !isActive) return;
+
+    if (isActive) {
+      // Pause
+      workerRef.current?.postMessage({ type: 'PAUSE' });
+    } else {
+      // Start
+      workerRef.current?.postMessage({ type: 'START', payload: timeLeft });
+    }
     setIsActive(!isActive);
   };
 
   const resetTimer = () => {
+    workerRef.current?.postMessage({ type: 'RESET' });
     setIsActive(false);
     setIsComplete(false);
     setTimeLeft(mode === TimerMode.CUSTOM ? customDuration : MODES[mode].duration);
   };
 
   const changeMode = (newMode: TimerMode) => {
+    workerRef.current?.postMessage({ type: 'RESET' });
     setMode(newMode);
     setIsActive(false);
     setIsComplete(false);
@@ -155,7 +289,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-coffee-50 flex flex-col items-center justify-center p-4 font-sans text-coffee-900 transition-colors duration-700">
-      {/* Changed to a melodic, bubbly marimba ringtone vibe */}
       <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/221/221-preview.mp3" />
       
       {/* Header */}
@@ -208,8 +341,26 @@ const App: React.FC = () => {
           />
         </div>
 
+        {/* Cycle Progress Dots (Only visible in standard modes) */}
+        {mode !== TimerMode.CUSTOM && (
+          <div className="relative z-10 flex justify-center items-center gap-2 mt-4">
+             <span className="text-xs font-bold text-coffee-400 uppercase tracking-widest">Cycle Progress</span>
+             <div className="flex gap-1">
+               {[1, 2, 3, 4].map((i) => (
+                 <div 
+                   key={i} 
+                   className={`w-3 h-3 rounded-full border border-coffee-400 transition-all duration-300 ${
+                     cycleCount >= i ? 'bg-coffee-600 scale-110' : 'bg-transparent'
+                   }`}
+                   title={`Session ${i}`}
+                 />
+               ))}
+             </div>
+          </div>
+        )}
+
         {/* Time Display */}
-        <div className="text-center mt-6 relative z-10 h-24 flex flex-col items-center justify-center">
+        <div className="text-center mt-2 relative z-10 h-24 flex flex-col items-center justify-center">
           {mode === TimerMode.CUSTOM && !isActive && !isComplete ? (
              <div className="flex items-center justify-center gap-2 animate-bounce-slow">
                {/* Hours */}
@@ -248,15 +399,16 @@ const App: React.FC = () => {
             </div>
           )}
           
-          <div className="text-coffee-500 font-hand text-lg mt-2">
+          <div className="text-coffee-500 font-hand text-lg mt-2 flex items-center gap-2">
+            {isActive && <Zap size={16} className="animate-pulse text-coffee-400" />}
             {isActive 
-              ? (mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK ? "Enjoy your sip..." : "Brewing focus...") 
+              ? (mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK ? "Relaxing..." : "Focusing...") 
               : (isComplete ? "Brew Complete!" : (mode === TimerMode.CUSTOM ? "Set time & brew" : "Ready to brew?"))}
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex justify-center items-center gap-6 mt-8 relative z-10">
+        <div className="flex justify-center items-center gap-6 mt-6 relative z-10">
           <button 
             onClick={toggleTimer}
             disabled={timeLeft === 0 && !isActive}
