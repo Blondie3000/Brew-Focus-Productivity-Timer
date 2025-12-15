@@ -288,157 +288,170 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-coffee-50 flex flex-col items-center justify-center p-4 font-sans text-coffee-900 transition-colors duration-700">
+    <div className="min-h-screen bg-coffee-50 flex items-center justify-center p-4 font-sans text-coffee-900 transition-colors duration-700">
       <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/221/221-preview.mp3" />
-      
-      {/* Header */}
-      <header className="mb-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-coffee-800 tracking-tight flex items-center justify-center gap-3">
-          <Coffee size={40} className="text-coffee-600" />
-          Brew & Focus
-        </h1>
-        <p className="text-coffee-500 mt-2 font-hand text-xl">Fill your cup with productivity</p>
-      </header>
 
-      {/* Roast Toggle */}
-      <RoastToggle currentRoast={roast} onRoastChange={setRoast} />
+      {/* Main Card Container - Two Column Layout */}
+      <main className="bg-coffee-100 w-full max-w-5xl rounded-[3rem] shadow-2xl border-4 border-coffee-200 relative overflow-hidden transition-colors duration-700 flex flex-col md:grid md:grid-cols-5">
 
-      {/* Main Card */}
-      <main className="bg-coffee-100 w-full max-w-lg rounded-[3rem] shadow-2xl p-8 border-4 border-coffee-200 relative overflow-hidden transition-colors duration-700">
-        
-        {/* Background decorative beans (subtle) */}
-        <div className="absolute top-4 left-4 text-coffee-200 opacity-30 rotate-12">
-          <Coffee size={60} />
-        </div>
-        <div className="absolute bottom-4 right-4 text-coffee-200 opacity-30 -rotate-12">
-          <Coffee size={80} />
-        </div>
+        {/* --- LEFT COLUMN: VISUALS (40%) --- */}
+        <div className="md:col-span-2 bg-coffee-50 bg-opacity-40 p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r-2 border-coffee-200 relative gap-6">
+          
+          {/* Header Branding */}
+          <header className="text-center">
+            <h1 className="text-3xl font-bold text-coffee-800 tracking-tight flex items-center justify-center gap-2">
+              <Coffee size={32} className="text-coffee-600" />
+              Brew & Focus
+            </h1>
+            <p className="text-coffee-500 mt-1 font-hand text-lg">Fill your cup with focus</p>
+          </header>
 
-        {/* Mode Toggles */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8 relative z-10">
-          {(Object.keys(MODES) as TimerMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => changeMode(m)}
-              className={`px-4 py-2 rounded-full font-bold text-sm transition-all duration-300 ${
-                mode === m 
-                  ? 'bg-coffee-600 text-coffee-50 shadow-md transform scale-105' 
-                  : 'bg-coffee-200 text-coffee-700 hover:bg-coffee-300'
-              }`}
-            >
-              {MODES[m].label}
-            </button>
-          ))}
-        </div>
-
-        {/* Visual Timer */}
-        <div className="relative z-10">
-          <CoffeeIllustration 
-            progress={progress} 
-            isRunning={isActive} 
-            isComplete={isComplete} 
-            liquidColor={ROAST_THEMES[roast].liquid}
-          />
-        </div>
-
-        {/* Cycle Progress Dots (Only visible in standard modes) */}
-        {mode !== TimerMode.CUSTOM && (
-          <div className="relative z-10 flex justify-center items-center gap-2 mt-4">
-             <span className="text-xs font-bold text-coffee-400 uppercase tracking-widest">Cycle Progress</span>
-             <div className="flex gap-1">
-               {[1, 2, 3, 4].map((i) => (
-                 <div 
-                   key={i} 
-                   className={`w-3 h-3 rounded-full border border-coffee-400 transition-all duration-300 ${
-                     cycleCount >= i ? 'bg-coffee-600 scale-110' : 'bg-transparent'
-                   }`}
-                   title={`Session ${i}`}
-                 />
-               ))}
-             </div>
+          {/* Visual Timer Illustration */}
+          <div className="relative w-full flex justify-center">
+             <CoffeeIllustration 
+                progress={progress} 
+                isRunning={isActive} 
+                isComplete={isComplete} 
+                liquidColor={ROAST_THEMES[roast].liquid}
+              />
           </div>
-        )}
 
-        {/* Time Display */}
-        <div className="text-center mt-2 relative z-10 h-24 flex flex-col items-center justify-center">
-          {mode === TimerMode.CUSTOM && !isActive && !isComplete ? (
-             <div className="flex items-center justify-center gap-2 animate-bounce-slow">
-               {/* Hours */}
-               <div className="flex flex-col items-center">
-                 <input 
-                   type="number" 
-                   min="0" 
-                   max="23"
-                   value={Math.floor(customDuration / 3600)}
-                   onChange={handleCustomHoursChange}
-                   className="text-5xl md:text-6xl font-bold text-coffee-800 font-mono bg-transparent w-24 text-center focus:outline-none focus:border-b-4 focus:border-coffee-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder-coffee-300"
-                   placeholder="0"
-                 />
-                 <span className="text-sm font-hand text-coffee-500 mt-1">hrs</span>
-               </div>
-               
-               <span className="text-4xl md:text-6xl font-bold text-coffee-400 mb-6">:</span>
-               
-               {/* Minutes */}
-               <div className="flex flex-col items-center">
-                 <input 
-                   type="number" 
-                   min="0" 
-                   max="59"
-                   value={Math.floor((customDuration % 3600) / 60)}
-                   onChange={handleCustomMinutesChange}
-                   className="text-5xl md:text-6xl font-bold text-coffee-800 font-mono bg-transparent w-24 text-center focus:outline-none focus:border-b-4 focus:border-coffee-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder-coffee-300"
-                   placeholder="00"
-                 />
-                 <span className="text-sm font-hand text-coffee-500 mt-1">mins</span>
-               </div>
-             </div>
-          ) : (
-            <div className={`font-bold text-coffee-800 font-mono tracking-wider tabular-nums ${timeLeft >= 3600 ? 'text-5xl md:text-6xl' : 'text-6xl md:text-7xl'}`}>
-              {formatTime(timeLeft)}
+          {/* Cycle Progress & Stats */}
+          <div className="flex flex-col items-center gap-4 w-full">
+            {/* Cycle Dots */}
+            {mode !== TimerMode.CUSTOM && (
+              <div className="flex justify-center items-center gap-3">
+                <span className="text-sm font-bold text-coffee-400 uppercase tracking-widest">Cycle</span>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div 
+                      key={i} 
+                      className={`w-4 h-4 rounded-full border-2 border-coffee-400 transition-all duration-300 ${
+                        cycleCount >= i ? 'bg-coffee-600 scale-110' : 'bg-transparent'
+                      }`}
+                      title={`Session ${i}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Cups Brewed Counter */}
+            <div className="font-hand text-xl text-coffee-400 bg-white bg-opacity-50 px-6 py-3 rounded-full shadow-sm">
+              Cups brewed: <span className="font-bold text-coffee-600 text-3xl mx-1">{sessionCount}</span> ☕
             </div>
-          )}
-          
-          <div className="text-coffee-500 font-hand text-lg mt-2 flex items-center gap-2">
-            {isActive && <Zap size={16} className="animate-pulse text-coffee-400" />}
-            {isActive 
-              ? (mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK ? "Relaxing..." : "Focusing...") 
-              : (isComplete ? "Brew Complete!" : (mode === TimerMode.CUSTOM ? "Set time & brew" : "Ready to brew?"))}
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex justify-center items-center gap-6 mt-6 relative z-10">
-          <button 
-            onClick={toggleTimer}
-            disabled={timeLeft === 0 && !isActive}
-            className={`w-16 h-16 rounded-full text-coffee-50 flex items-center justify-center shadow-lg transition-all duration-300 active:scale-95 ${timeLeft === 0 && !isActive ? 'bg-coffee-300 cursor-not-allowed' : 'bg-coffee-600 hover:bg-coffee-700 hover:scale-110'}`}
-          >
-            {isActive ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
-          </button>
+        {/* --- RIGHT COLUMN: CONTROLS (60%) --- */}
+        <div className="md:col-span-3 p-8 flex flex-col items-center justify-center gap-6 relative">
           
-          <button 
-            onClick={resetTimer}
-            className="w-12 h-12 rounded-full bg-coffee-200 text-coffee-600 flex items-center justify-center hover:bg-coffee-300 hover:rotate-90 transition-all duration-300"
-          >
-            <RotateCcw size={24} />
-          </button>
+          {/* Background decorative beans (Right side only) */}
+          <div className="absolute top-4 right-4 text-coffee-200 opacity-30 rotate-12 pointer-events-none">
+            <Coffee size={80} />
+          </div>
+          <div className="absolute bottom-4 left-4 text-coffee-200 opacity-30 -rotate-12 pointer-events-none">
+            <Coffee size={60} />
+          </div>
+
+          {/* Roast Toggle */}
+          <div className="w-full max-w-xs z-10">
+             <RoastToggle currentRoast={roast} onRoastChange={setRoast} />
+          </div>
+
+          {/* Mode Toggles */}
+          <div className="flex flex-wrap justify-center gap-2 relative z-10 w-full">
+            {(Object.keys(MODES) as TimerMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => changeMode(m)}
+                className={`px-4 py-2 rounded-full font-bold text-sm transition-all duration-300 ${
+                  mode === m 
+                    ? 'bg-coffee-600 text-coffee-50 shadow-md transform scale-105' 
+                    : 'bg-coffee-200 text-coffee-700 hover:bg-coffee-300'
+                }`}
+              >
+                {MODES[m].label}
+              </button>
+            ))}
+          </div>
+
+          {/* Time Display */}
+          <div className="text-center relative z-10 min-h-[8rem] flex flex-col items-center justify-center">
+            {mode === TimerMode.CUSTOM && !isActive && !isComplete ? (
+              <div className="flex items-center justify-center gap-2">
+                {/* Hours */}
+                <div className="flex flex-col items-center">
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="23"
+                    value={Math.floor(customDuration / 3600)}
+                    onChange={handleCustomHoursChange}
+                    className="text-5xl md:text-6xl font-bold text-coffee-800 font-mono bg-transparent w-24 text-center focus:outline-none focus:border-b-4 focus:border-coffee-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder-coffee-300"
+                    placeholder="0"
+                  />
+                  <span className="text-sm font-hand text-coffee-500 mt-1">hrs</span>
+                </div>
+                
+                <span className="text-4xl md:text-6xl font-bold text-coffee-400 mb-6">:</span>
+                
+                {/* Minutes */}
+                <div className="flex flex-col items-center">
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="59"
+                    value={Math.floor((customDuration % 3600) / 60)}
+                    onChange={handleCustomMinutesChange}
+                    className="text-5xl md:text-6xl font-bold text-coffee-800 font-mono bg-transparent w-24 text-center focus:outline-none focus:border-b-4 focus:border-coffee-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder-coffee-300"
+                    placeholder="00"
+                  />
+                  <span className="text-sm font-hand text-coffee-500 mt-1">mins</span>
+                </div>
+              </div>
+            ) : (
+              <div className={`font-bold text-coffee-800 font-mono tracking-wider tabular-nums ${timeLeft >= 3600 ? 'text-5xl md:text-6xl' : 'text-6xl md:text-7xl'}`}>
+                {formatTime(timeLeft)}
+              </div>
+            )}
+            
+            <div className="text-coffee-500 font-hand text-lg mt-2 flex items-center gap-2">
+              {isActive && <Zap size={16} className="animate-pulse text-coffee-400" />}
+              {isActive 
+                ? (mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK ? "Relaxing..." : "Focusing...") 
+                : (isComplete ? "Brew Complete!" : (mode === TimerMode.CUSTOM ? "Set time & brew" : "Ready to brew?"))}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex justify-center items-center gap-6 relative z-10">
+            <button 
+              onClick={toggleTimer}
+              disabled={timeLeft === 0 && !isActive}
+              className={`w-16 h-16 rounded-full text-coffee-50 flex items-center justify-center shadow-lg transition-all duration-300 active:scale-95 ${timeLeft === 0 && !isActive ? 'bg-coffee-300 cursor-not-allowed' : 'bg-coffee-600 hover:bg-coffee-700 hover:scale-110'}`}
+            >
+              {isActive ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+            </button>
+            
+            <button 
+              onClick={resetTimer}
+              className="w-12 h-12 rounded-full bg-coffee-200 text-coffee-600 flex items-center justify-center hover:bg-coffee-300 hover:rotate-90 transition-all duration-300"
+            >
+              <RotateCcw size={24} />
+            </button>
+          </div>
+
+          {/* Barista Bot */}
+          <div className="w-full z-10">
+             <BaristaBot 
+              show={isActive || isComplete} 
+              isBreak={mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK} 
+            />
+          </div>
+
         </div>
-
-        {/* Gemini Integration */}
-        <BaristaBot 
-          show={isActive || isComplete} 
-          isBreak={mode === TimerMode.SHORT_BREAK || mode === TimerMode.LONG_BREAK} 
-        />
-
       </main>
-
-      {/* Stats Footer */}
-      <footer className="mt-8 text-center text-coffee-400">
-        <p className="font-hand text-lg">
-          Cups brewed today: <span className="font-bold text-coffee-600 text-2xl mx-1">{sessionCount}</span> ☕
-        </p>
-      </footer>
     </div>
   );
 };

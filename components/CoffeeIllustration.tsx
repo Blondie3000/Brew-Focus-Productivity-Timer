@@ -17,7 +17,7 @@ export const CoffeeIllustration: React.FC<CoffeeIllustrationProps> = ({ progress
   const currentY = LIQUID_BASE_Y - currentLiquidHeight;
 
   return (
-    <div className="relative w-72 h-72 md:w-96 md:h-96 mx-auto transition-all duration-500">
+    <div className="relative w-80 h-80 md:w-[28rem] md:h-[28rem] mx-auto transition-all duration-500">
       <svg viewBox="0 0 400 400" className="w-full h-full drop-shadow-xl overflow-visible">
         <defs>
             {/* Clip path for the liquid inside the rounded mug */}
