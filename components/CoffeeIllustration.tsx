@@ -155,7 +155,7 @@ export const CoffeeIllustration: React.FC<CoffeeIllustrationProps> = ({ progress
 
         {/* --- Drip Animation --- */}
         {isRunning && !isComplete && (
-            <g className="animate-[drip_1.2s_infinite]">
+            <g className="animate-drip">
                 {/* Teardrop shape */}
                 <path 
                   d="M200,190 Q207,200 207,206 A7,7 0 1,1 193,206 Q193,200 200,190 Z" 
